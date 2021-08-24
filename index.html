@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <title>Virus Simulation</title>
+  <meta name="description" content="A basic simulation of how viruses spread in a population">
+  <style>
+    html,
+    body {
+      height: 100%;
+      overflow: hidden;
+    }
+
+    body {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background-color: #efefef;
+      color: #111;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+      padding: 5px;
+    }
+
+    canvas {
+      display: block;
+      max-width: 100%;
+      margin-top: 5px;
+    }
+
+    form {
+      display: inline-block;
+    }
+
+    label {
+      font-weight: bold;
+    }
+
+    button {
+      font-family: inherit;
+    }
+  </style>
+</head>
+
+<body>
+  <div>
+    <h1>Virus Simulation</h1>
+    <button id="start-simulation-button">Start Simulation</button>
+    <button id="step-simulation-button">Step Forward Simulation</button>
+    <button id="reset-simulation-button" type="reset">Reset Simulation</button>
+    <form>
+      <label for="stop-simulation-automatically">Automatically Stop:</label>
+      <input id="stop-simulation-automatically" type="checkbox">
+    </form>
+    <div>
+      <span><b>Days Since Start: </b><span id="days">0</span></span>
+      <span><b>Total Cases: </b><span id="total-cases">5</span></span>
+      <span><b>Current Cases: </b><span id="current-cases">5</span></span>
+      <span><b>Total Deaths: </b><span id="total-deaths">0</span></span>
+    </div>
+    <canvas id="canvas" width="600px" height="600px"></canvas>
+  </div>
+  <script>
+    // Initalize DOM Elements
+    const startSimulationButton = document.getElementById("start-simulation-button");
+    const stepSimulationButton = document.getElementById("step-simulation-button");
+    const resetSimulationButton = document.getElementById("reset-simulation-button");
+    const autoStopSimulationCheckbox = document.getElementById("stop-simulation-automatically");
+    const totalCasesOutput = document.getElementById("total-cases");
+    const currentCasesOutput = document.getElementById("current-cases");
+    const totalDeathsOutput = document.getElementById("total-deaths");
+    const daysOutput = document.getElementById("days");
+
+    // Intialize Canvas
+    const canvas = document.getElementById("canvas");
+    const canvasContext = canvas.getContext("2d");
+
+    // Initialize constants
+    const initialInfections = 5;
+    const populationDensity = 267;
+    let people;
+
+    function intializeSimulation() {
+      people = [];
+
+      for (let i = 0; i < populationDensity - initialInfections; i++) {
+        const xPos = Math.floor(Math.random() * (canvas.width - 4));
+        const yPos = Math.floor(Math.random() * (canvas.height - 4));
+
+        const targetXPos = Math.floor(Math.random() * (canvas.width - 4));
+        const targetYPos = Math.floor(Math.random() * (canvas.width - 4));
+
+        people.push({ xPos, yPos, target: { xPos: targetXPos, yPos: targetYPos }, state: "susceptible", daysInfected: 0 });
+      }
+
+      for (let i = 0; i < initialInfections; i++) {
+        const xPos = Math.floor(Math.random() * (canvas.width - 4));
+        const yPos = Math.floor(Math.random() * (canvas.height - 4));
+
+        const targetXPos = Math.floor(Math.random() * (canvas.width - 4));
+        const targetYPos = Math.floor(Math.random() * (canvas.width - 4));
+
+        people.push({ xPos, yPos, target: { xPos: targetXPos, yPos: targetYPos }, state: "infectious", daysInfected: 0 });
+      }
+
+      drawCanvas();
+    }
+
+    intializeSimulation();
+
+    // Event Handlers
+    let running = false;
+
+    startSimulationButton.addEventListener("click", function () {
+      if (!running) {
+        startSimulation();
+      } else {
+        stopSimulation();
+      }
+
+      running = !running;
+    });
+
+    stepSimulationButton.addEventListener("click", function () {
+      stepSimulation();
+    });
+
+    resetSimulationButton.addEventListener("click", function () {
+      intializeSimulation();
+    });
+
+    // Simulation
+    let interval;
+    let dayCount = 0;
+
+    function startSimulation() {
+      interval = setInterval(function () {
+        stepSimulation();
+      }, 200);
+
+      startSimulationButton.textContent = "Stop Simulation";
+    }
+
+    function stopSimulation() {
+      clearInterval(interval);
+
+      startSimulationButton.textContent = "Start Simulation";
+    }
+
+    function stepSimulation() {
+      if (people.find((person) => person.state === "infectious") === undefined && autoStopSimulationCheckbox.checked === true) stopSimulation();
+
+      people.forEach(function (person) {
+        // Movement
+        newXPos = person.xPos + Math.sign(person.target.xPos - person.xPos) * 4;
+        newYPos = person.yPos + Math.sign(person.target.yPos - person.yPos) * 4;
+
+        if (newXPos <= canvas.width - 4 && newXPos >= 0) person.xPos = newXPos;
+        if (newYPos <= canvas.height - 4 && newYPos >= 0) person.yPos = newYPos;
+
+        if (isInRadius(person.xPos, person.yPos, person.target.xPos, person.target.yPos, 4)) {
+          const targetXPos = Math.floor(Math.random() * (canvas.width - 4));
+          const targetYPos = Math.floor(Math.random() * (canvas.width - 4));
+
+          person.target = { xPos: targetXPos, yPos: targetYPos };
+        }
+
+        // Infections
+        if (person.state === "infectious") person.daysInfected += 0.2;
+        if (person.daysInfected >= 14) {
+          person.state = "removed";
+        }
+
+        if (person.state === "susceptible") {
+          people.forEach(function (otherPerson) {
+            if (isInRadius(person.xPos, person.yPos, otherPerson.xPos, otherPerson.yPos, 4) && otherPerson.state === "infectious") {
+              person.state = "infectious";
+            }
+          });
+        }
+      });
+
+      // Increment Day Count
+      dayCount += 0.2;
+
+      drawCanvas();
+
+      // Update Stats
+      totalCasesOutput.textContent = people.filter((person) => person.state === "infectious" || person.state === "removed").length;
+      currentCasesOutput.textContent = people.filter((person) => person.state === "infectious").length;
+      daysOutput.textContent = Math.floor(dayCount);
+    }
+
+    // Draw Canvas
+    function drawCanvas() {
+      canvasContext.fillStyle = "#fff";
+      canvasContext.fillRect(0, 0, canvas.width, canvas.height);
+
+      people.forEach(function (person) {
+        switch (person.state) {
+          case "susceptible":
+            canvasContext.fillStyle = "#00f";
+            break;
+          case "infectious":
+            canvasContext.fillStyle = "#f00";
+            break;
+          case "removed":
+            canvasContext.fillStyle = "#ddd";
+            break;
+          default:
+            break;
+        }
+
+        canvasContext.fillRect(person.xPos, person.yPos, 4, 4);
+      });
+    }
+
+    // Helper Functions
+    function isInRadius(x1, y1, x2, y2, radius) {
+      if (Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2) <= radius) {
+        return true;
+      }
+      return false;
+    }
+  </script>
+</body>
+
+</html>
